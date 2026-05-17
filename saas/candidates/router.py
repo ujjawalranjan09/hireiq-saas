@@ -31,6 +31,11 @@ async def validate_invite_token(
     
     Checks if token exists, is not expired, and has status "invited".
     Returns job title and company name. No side effects.
+    
+    Raises:
+        HTTPException 404: Token not found
+        HTTPException 410: Token expired
+        HTTPException 409: Interview already started or completed
     """
     result = await db.execute(
         select(Candidate)
@@ -39,29 +44,23 @@ async def validate_invite_token(
     candidate = result.scalar_one_or_none()
     
     if candidate is None:
-        return CandidateValidateResponse(
-            valid=False,
-            job_title="",
-            company_name="",
-            candidate_name=None
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Token not found"
         )
     
     # Check if expired
-    if candidate.token_expiry < datetime.utcnow():
-        return CandidateValidateResponse(
-            valid=False,
-            job_title="",
-            company_name="",
-            candidate_name=candidate.name
+    if candidate.token_expiry < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Token has expired"
         )
     
     # Check status
     if candidate.status != CandidateStatus.INVITED:
-        return CandidateValidateResponse(
-            valid=False,
-            job_title="",
-            company_name="",
-            candidate_name=candidate.name
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Interview already started or completed"
         )
     
     # Get job and company info
@@ -71,11 +70,9 @@ async def validate_invite_token(
     job = job_result.scalar_one_or_none()
     
     if job is None:
-        return CandidateValidateResponse(
-            valid=False,
-            job_title="",
-            company_name="",
-            candidate_name=candidate.name
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found for candidate"
         )
     
     company_result = await db.execute(

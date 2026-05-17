@@ -7,7 +7,7 @@
 # - MAY import from workers/tasks/ to fire background tasks
 # - MAY NOT import from saas/auth/, saas/jobs/, saas/companies/, or saas/dashboard/
 
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import asyncio
@@ -33,7 +33,7 @@ async def validate_invite_token(token: str, db: AsyncSession) -> Candidate | Non
         select(Candidate)
         .where(Candidate.invite_token == token)
         .where(Candidate.status == CandidateStatus.INVITED)
-        .where(Candidate.token_expiry > datetime.utcnow())
+        .where(Candidate.token_expiry > datetime.now(timezone.utc))
     )
     candidate = result.scalar_one_or_none()
     return candidate
@@ -115,14 +115,20 @@ async def start_session(token: str, db: AsyncSession) -> dict:
     )
     
     # Step 5: Initialize the session (returns MongoDB session ID)
-    mongo_session_id = await orchestrator.initialize()
+    # Wrap in try/except to prevent DB writes if orchestrator fails
+    try:
+        # Run sync orchestrator.initialize() in thread pool to avoid blocking
+        mongo_session_id = await asyncio.to_thread(orchestrator.initialize)
+    except Exception as e:
+        # Orchestrator failed - do NOT update database
+        raise ValueError(f"Failed to initialize interview session: {str(e)}")
     
-    # Step 6: Update Candidate row
+    # Step 6-7: Only update DB after orchestrator succeeds
     candidate.status = CandidateStatus.STARTED
     candidate.mongo_session_id = mongo_session_id
     db.add(candidate)
     
-    # Step 7: Increment company's interviews_used counter
+    # Increment company's interviews_used counter
     company_result = await db.execute(
         select(Company).where(Company.id == candidate.company_id)
     )
@@ -133,6 +139,7 @@ async def start_session(token: str, db: AsyncSession) -> dict:
         db.add(company)
     
     # Step 8: Commit will happen automatically via dependency
+    # Only commits if no exception is raised after this point
     
     # Step 9: Return response dictionary
     return {
@@ -150,11 +157,13 @@ async def complete_session(token: str, overall_score: float, db: AsyncSession) -
     Called when an interview ends.
     
     Steps:
-    1. Update the Candidate row to status="completed"
-    2. Save the overall_score
-    3. Set completed_at to now
-    4. Commit the transaction
-    5. Fire the rank_candidates Celery task for the job
+    1. Find the candidate by token
+    2. Check if status is STARTED (prevent double completion)
+    3. Update the Candidate row to status="completed"
+    4. Save the overall_score
+    5. Set completed_at to now
+    6. Commit the transaction
+    7. Fire the rank_candidates Celery task for the job
     
     Args:
         token: The candidate's invite token
@@ -163,6 +172,9 @@ async def complete_session(token: str, overall_score: float, db: AsyncSession) -
         
     Returns:
         dict with success status and candidate info
+        
+    Raises:
+        ValueError: If candidate not found or session not in started state
     """
     # Find the candidate
     result = await db.execute(
@@ -174,15 +186,19 @@ async def complete_session(token: str, overall_score: float, db: AsyncSession) -
     if candidate is None:
         raise ValueError("Candidate not found")
     
-    # Step 1-3: Update candidate record
+    # Step 2: Status guard - prevent double completion
+    if candidate.status != CandidateStatus.STARTED:
+        raise ValueError("Session is not in started state")
+    
+    # Step 3-5: Update candidate record
     candidate.status = CandidateStatus.COMPLETED
     candidate.overall_score = overall_score
-    candidate.completed_at = datetime.utcnow()
+    candidate.completed_at = datetime.now(timezone.utc)
     db.add(candidate)
     
-    # Step 4: Commit will happen automatically
+    # Step 6: Commit will happen automatically
     
-    # Step 5: Fire the rank_candidates Celery task
+    # Step 7: Fire the rank_candidates Celery task
     # Import here to avoid circular imports
     try:
         from workers.tasks.rank_candidates import rank_candidates_job

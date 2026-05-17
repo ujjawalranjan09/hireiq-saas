@@ -38,9 +38,9 @@ services:
     image: postgres:16
     container_name: hireiq-postgres
     environment:
-      POSTGRES_USER: hireiq
-      POSTGRES_PASSWORD: hireiq_password
-      POSTGRES_DB: hireiq_saas
+      POSTGRES_USER: ${POSTGRES_USER:-hireiq}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hireiq_password}
+      POSTGRES_DB: ${POSTGRES_DB:-hireiq_saas}
     ports:
       - "5432:5432"
     volumes:
@@ -75,22 +75,22 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - POSTGRES_URL=postgresql+asyncpg://hireiq:hireiq_password@postgres:5432/hireiq_saas
+      - POSTGRES_URL=postgresql+asyncpg://${POSTGRES_USER:-hireiq}:${POSTGRES_PASSWORD:-hireiq_password}@postgres:5432/${POSTGRES_DB:-hireiq_saas}
       - REDIS_URL=redis://redis:6379/0
       - MONGO_URI=mongodb://mongo:27017
       - MONGO_DB_NAME=interview_agent
-      - JWT_SECRET_KEY=your-secret-key-change-in-production
-      - JWT_ALGORITHM=HS256
-      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
-      - JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
-      - MAIL_USERNAME=test
-      - MAIL_PASSWORD=test
-      - MAIL_FROM=test@example.com
-      - MAIL_SERVER=localhost
-      - MAIL_PORT=587
-      - CANDIDATE_PORTAL_BASE_URL=http://localhost:5174
-      - HR_DASHBOARD_BASE_URL=http://localhost:5173
-      - FREE_TIER_INTERVIEW_LIMIT=10
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - JWT_REFRESH_TOKEN_EXPIRE_DAYS=${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM=${MAIL_FROM}
+      - MAIL_SERVER=${MAIL_SERVER}
+      - MAIL_PORT=${MAIL_PORT}
+      - CANDIDATE_PORTAL_BASE_URL=${CANDIDATE_PORTAL_BASE_URL:-http://localhost:5174}
+      - HR_DASHBOARD_BASE_URL=${HR_DASHBOARD_BASE_URL:-http://localhost:5173}
+      - FREE_TIER_INTERVIEW_LIMIT=${FREE_TIER_INTERVIEW_LIMIT:-10}
     depends_on:
       postgres:
         condition: service_healthy
@@ -106,17 +106,17 @@ services:
     container_name: hireiq-worker
     command: celery -A workers.celery_app worker --loglevel=info
     environment:
-      - POSTGRES_URL=postgresql+asyncpg://hireiq:hireiq_password@postgres:5432/hireiq_saas
+      - POSTGRES_URL=postgresql+asyncpg://${POSTGRES_USER:-hireiq}:${POSTGRES_PASSWORD:-hireiq_password}@postgres:5432/${POSTGRES_DB:-hireiq_saas}
       - REDIS_URL=redis://redis:6379/0
       - MONGO_URI=mongodb://mongo:27017
       - MONGO_DB_NAME=interview_agent
-      - JWT_SECRET_KEY=your-secret-key-change-in-production
-      - JWT_ALGORITHM=HS256
-      - MAIL_USERNAME=test
-      - MAIL_PASSWORD=test
-      - MAIL_FROM=test@example.com
-      - MAIL_SERVER=localhost
-      - MAIL_PORT=587
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM=${MAIL_FROM}
+      - MAIL_SERVER=${MAIL_SERVER}
+      - MAIL_PORT=${MAIL_PORT}
     depends_on:
       postgres:
         condition: service_healthy

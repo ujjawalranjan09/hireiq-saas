@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, nullslast
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 import secrets
 
 from database.postgres import get_db
@@ -209,7 +209,7 @@ async def update_job(
         "id": job.id,
         "title": job.title,
         "status": job.status.value,
-        "updated_at": datetime.utcnow()
+        "updated_at": datetime.now(timezone.utc)
     }
 
 
@@ -273,7 +273,7 @@ async def invite_candidates(
     
     # Create candidate records
     candidates_created = []
-    token_expiry = datetime.utcnow() + timedelta(days=7)
+    token_expiry = datetime.now(timezone.utc) + timedelta(days=7)
     
     for email in request.emails:
         candidate = Candidate(

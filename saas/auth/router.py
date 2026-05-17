@@ -8,7 +8,7 @@ from database.postgres import get_db
 from database.pg_models.company import Company, SubscriptionPlan
 from database.pg_models.user import User, UserRole
 from saas.auth.service import hash_password, verify_password, create_access_token, create_refresh_token
-from saas.auth.schemas import RegisterRequest, LoginRequest, TokenResponse, UserResponse
+from saas.auth.schemas import RegisterRequest, LoginRequest, TokenResponse, UserResponse, RefreshRequest
 from saas.auth.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -116,13 +116,13 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(request: dict, db: AsyncSession = Depends(get_db)):
+async def refresh_token(request: RefreshRequest, db: AsyncSession = Depends(get_db)):
     """
     Refresh access token using refresh token.
     
     Accepts a refresh token and returns a new access token.
     """
-    refresh_token_str = request.get("refresh_token")
+    refresh_token_str = request.refresh_token
     
     if not refresh_token_str:
         raise HTTPException(
