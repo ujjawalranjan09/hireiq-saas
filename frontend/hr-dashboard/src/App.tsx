@@ -2,7 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
-import { JobsList } from './pages/JobsList';
+import { JobsPage } from './pages/Jobs';
+import { InterviewDetail } from './pages/InterviewDetail';
 
 function App() {
   return (
@@ -21,7 +22,15 @@ function App() {
           path="/jobs"
           element={
             <ProtectedRoute>
-              <JobsList />
+              <JobsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/jobs/:jobId/candidates/:candidateToken"
+          element={
+            <ProtectedRoute>
+              <InterviewDetail />
             </ProtectedRoute>
           }
         />

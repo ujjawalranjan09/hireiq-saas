@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '../api/client';
+import { getJobs, createJob, archiveJob, getCandidates, inviteCandidates } from '../api/jobs';
 
 interface Job {
   id: string;
@@ -10,10 +11,22 @@ interface Job {
   avg_score: number | null;
 }
 
+interface Candidate {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  score: number | null;
+  rank: number | null;
+  token: string;
+}
+
 export const JobsPage: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,7 +35,7 @@ export const JobsPage: React.FC = () => {
 
   const fetchJobs = async () => {
     try {
-      const response = await apiClient.get('/jobs/');
+      const response = await getJobs();
       setJobs(response.data);
     } catch (err: any) {
       console.error('Failed to fetch jobs:', err);
@@ -34,12 +47,21 @@ export const JobsPage: React.FC = () => {
   const handleArchive = async (jobId: string) => {
     if (confirm('Are you sure you want to archive this job?')) {
       try {
-        await apiClient.delete(`/jobs/${jobId}/archive`);
+        await archiveJob(jobId);
         fetchJobs();
       } catch (err: any) {
         alert('Failed to archive job');
       }
     }
+  };
+
+  const handleViewJob = (jobId: string) => {
+    navigate(`/jobs/${jobId}`);
+  };
+
+  const handleInviteCandidates = (jobId: string) => {
+    setSelectedJobId(jobId);
+    setShowInviteModal(true);
   };
 
   if (loading) return <div>Loading...</div>;
@@ -48,7 +70,7 @@ export const JobsPage: React.FC = () => {
     <div style={styles.container}>
       <div style={styles.header}>
         <h1>Jobs</h1>
-        <button style={styles.createButton} onClick={() => setShowModal(true)}>
+        <button style={styles.createButton} onClick={() => setShowCreateModal(true)}>
           Create New Job
         </button>
       </div>
@@ -79,9 +101,15 @@ export const JobsPage: React.FC = () => {
               <td>
                 <button 
                   style={styles.actionButton}
-                  onClick={() => navigate(`/jobs/${job.id}`)}
+                  onClick={() => handleViewJob(job.id)}
                 >
                   View
+                </button>
+                <button 
+                  style={styles.inviteButton}
+                  onClick={() => handleInviteCandidates(job.id)}
+                >
+                  Invite
                 </button>
                 {job.status === 'active' && (
                   <button 
@@ -96,7 +124,17 @@ export const JobsPage: React.FC = () => {
           ))}
         </tbody>
       </table>
-      {showModal && <CreateJobModal onClose={() => setShowModal(false)} onCreated={fetchJobs} />}
+      {showCreateModal && <CreateJobModal onClose={() => setShowCreateModal(false)} onCreated={fetchJobs} />}
+      {showInviteModal && selectedJobId && (
+        <InviteCandidatesModal 
+          jobId={selectedJobId} 
+          onClose={() => {
+            setShowInviteModal(false);
+            setSelectedJobId(null);
+          }} 
+          onInvited={fetchJobs} 
+        />
+      )}
     </div>
   );
 };
@@ -135,7 +173,7 @@ const CreateJobModal: React.FC<{ onClose: () => void; onCreated: () => void }> =
     e.preventDefault();
     setLoading(true);
     try {
-      await apiClient.post('/jobs/', formData);
+      await createJob(formData);
       onCreated();
       onClose();
     } catch (err: any) {
@@ -231,6 +269,52 @@ const CreateJobModal: React.FC<{ onClose: () => void; onCreated: () => void }> =
   );
 };
 
+const InviteCandidatesModal: React.FC<{ jobId: string; onClose: () => void; onInvited: () => void }> = ({ jobId, onClose, onInvited }) => {
+  const [emails, setEmails] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const emailArray = emails.split('\n').map(e => e.trim()).filter(e => e.length > 0);
+      await inviteCandidates(jobId, emailArray);
+      alert(`Successfully invited ${emailArray.length} candidates!`);
+      onInvited();
+      onClose();
+    } catch (err: any) {
+      alert('Failed to send invites: ' + (err.response?.data?.detail || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.modalOverlay}>
+      <div style={styles.modal}>
+        <h2>Invite Candidates</h2>
+        <form onSubmit={handleSubmit}>
+          <div style={styles.formGroup}>
+            <label>Email Addresses (one per line)</label>
+            <textarea
+              value={emails}
+              onChange={(e) => setEmails(e.target.value)}
+              style={{ ...styles.input, minHeight: '200px' }}
+              placeholder="candidate1@example.com&#10;candidate2@example.com"
+            />
+          </div>
+          <div style={styles.modalActions}>
+            <button type="button" onClick={onClose} style={styles.cancelButton}>Cancel</button>
+            <button type="submit" disabled={loading} style={styles.submitButton}>
+              {loading ? 'Sending...' : 'Send Invites'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const styles: { [key: string]: React.CSSProperties } = {
   container: { padding: '2rem' },
   header: {
@@ -262,6 +346,15 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: '0.5rem 1rem',
     marginRight: '0.5rem',
     backgroundColor: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+  },
+  inviteButton: {
+    padding: '0.5rem 1rem',
+    marginRight: '0.5rem',
+    backgroundColor: '#28a745',
     color: 'white',
     border: 'none',
     borderRadius: '4px',
