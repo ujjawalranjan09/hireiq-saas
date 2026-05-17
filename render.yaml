@@ -1,0 +1,85 @@
+# HireIQ SaaS Platform - Deployment Configuration
+
+This file defines the Render.com deployment configuration for the HireIQ SaaS platform.
+
+services:
+  # FastAPI Backend Service
+  - type: web
+    name: hireiq-api
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn gateway.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: POSTGRES_URL
+        fromDatabase:
+          name: hireiq-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: hireiq-redis
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 30
+      - key: JWT_REFRESH_TOKEN_EXPIRE_DAYS
+        value: 7
+      - key: MONGO_URI
+        sync: false
+      - key: MONGO_DB_NAME
+        value: interview_agent
+      - key: CANDIDATE_PORTAL_BASE_URL
+        fromService:
+          type: static
+          name: candidate-portal
+      - key: HR_DASHBOARD_BASE_URL
+        fromService:
+          type: static
+          name: hr-dashboard
+      - key: FREE_TIER_INTERVIEW_LIMIT
+        value: 10
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_SERVER
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: 587
+    healthCheckPath: /health
+
+  # HR Dashboard - Static Site
+  - type: static
+    name: hr-dashboard
+    env: static
+    region: oregon
+    buildCommand: cd frontend/hr-dashboard && npm install && npm run build
+    publishDir: frontend/hr-dashboard/dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+
+  # Candidate Portal - Static Site
+  - type: static
+    name: candidate-portal
+    env: static
+    region: oregon
+    buildCommand: cd frontend/candidate-portal && npm install && npm run build
+    publishDir: frontend/candidate-portal/dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+
+databases:
+  - name: hireiq-db
+    databaseName: hireiq_saas
+    user: hireiq
+    ipAllowList: []

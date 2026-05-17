@@ -1,0 +1,69 @@
+```
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+.venv/
+venv/
+ENV/
+
+# Build and distribution artifacts
+dist/
+build/
+*.egg-info/
+.eggs/
+.sass-cache/
+.npm/
+.yarn/
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+.env.*
+.envrc
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+htmlcov/
+.coverage.*
+.cache/
+.pytest_cache/
+.hypothesis/
+
+# Database
+*.sqlite
+*.db
+
+# Docker
+.dockerenv
+
+# Alembic
+alembic/versions/
+
+# Frontend build artifacts
+**/dist/
+**/build/
+**/node_modules/
+
+# Workers
+workers/.phase2_complete
+```

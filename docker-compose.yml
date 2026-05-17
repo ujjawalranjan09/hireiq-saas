@@ -1,0 +1,79 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - MONGO_DB_NAME=interview_agent
+    volumes:
+      - ./outputs:/app/outputs
+      - ./assets:/app/assets
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: hireiq
+      POSTGRES_PASSWORD: hireiq_password
+      POSTGRES_DB: hireiq_saas
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    command: uvicorn gateway.main:app --host 0.0.0.0 --port 8000
+    environment:
+      - POSTGRES_URL=postgresql+asyncpg://hireiq:hireiq_password@postgres:5432/hireiq_saas
+      - REDIS_URL=redis://redis:6379/0
+      - MONGO_URI=mongodb://mongo:27017
+      - MONGO_DB_NAME=interview_agent
+    depends_on:
+      - postgres
+      - redis
+      - mongo
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: celery -A workers.celery_app worker --loglevel=info
+    environment:
+      - POSTGRES_URL=postgresql+asyncpg://hireiq:hireiq_password@postgres:5432/hireiq_saas
+      - REDIS_URL=redis://redis:6379/0
+      - MONGO_URI=mongodb://mongo:27017
+      - MONGO_DB_NAME=interview_agent
+    depends_on:
+      - postgres
+      - redis
+      - mongo
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  postgres_data:
+  redis_data:
