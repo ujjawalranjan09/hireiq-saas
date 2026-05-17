@@ -1,6 +1,7 @@
 version: "3.8"
 
 services:
+  # Original Streamlit App (legacy)
   app:
     build: .
     ports:
@@ -13,64 +14,116 @@ services:
       - ./assets:/app/assets
     depends_on:
       - mongo
+    profiles:
+      - legacy
     restart: unless-stopped
 
+  # MongoDB (shared)
   mongo:
     image: mongo:7
+    container_name: hireiq-mongo
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
+  # PostgreSQL for SaaS layer
   postgres:
     image: postgres:16
-    ports:
-      - "5432:5432"
+    container_name: hireiq-postgres
     environment:
       POSTGRES_USER: hireiq
       POSTGRES_PASSWORD: hireiq_password
       POSTGRES_DB: hireiq_saas
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hireiq"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
+  # Redis for caching and Celery
   redis:
     image: redis:7
+    container_name: hireiq-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
+  # FastAPI SaaS API
   api:
     build: .
+    container_name: hireiq-api
+    command: uvicorn gateway.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
-    command: uvicorn gateway.main:app --host 0.0.0.0 --port 8000
     environment:
       - POSTGRES_URL=postgresql+asyncpg://hireiq:hireiq_password@postgres:5432/hireiq_saas
       - REDIS_URL=redis://redis:6379/0
       - MONGO_URI=mongodb://mongo:27017
       - MONGO_DB_NAME=interview_agent
+      - JWT_SECRET_KEY=your-secret-key-change-in-production
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+      - MAIL_USERNAME=test
+      - MAIL_PASSWORD=test
+      - MAIL_FROM=test@example.com
+      - MAIL_SERVER=localhost
+      - MAIL_PORT=587
+      - CANDIDATE_PORTAL_BASE_URL=http://localhost:5174
+      - HR_DASHBOARD_BASE_URL=http://localhost:5173
+      - FREE_TIER_INTERVIEW_LIMIT=10
     depends_on:
-      - postgres
-      - redis
-      - mongo
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_started
     restart: unless-stopped
 
+  # Celery Worker for background tasks
   worker:
     build: .
+    container_name: hireiq-worker
     command: celery -A workers.celery_app worker --loglevel=info
     environment:
       - POSTGRES_URL=postgresql+asyncpg://hireiq:hireiq_password@postgres:5432/hireiq_saas
       - REDIS_URL=redis://redis:6379/0
       - MONGO_URI=mongodb://mongo:27017
       - MONGO_DB_NAME=interview_agent
+      - JWT_SECRET_KEY=your-secret-key-change-in-production
+      - JWT_ALGORITHM=HS256
+      - MAIL_USERNAME=test
+      - MAIL_PASSWORD=test
+      - MAIL_FROM=test@example.com
+      - MAIL_SERVER=localhost
+      - MAIL_PORT=587
     depends_on:
-      - postgres
-      - redis
-      - mongo
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_started
     restart: unless-stopped
 
 volumes:

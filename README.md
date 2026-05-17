@@ -1,187 +1,279 @@
-<div align="center">
+# HireIQ SaaS Platform
 
-# 🎯 AI Multimodal Interview Agent
+A comprehensive AI-powered interview platform with a modern SaaS layer built on top of the original AI Interview Agent.
 
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
-[![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://mongodb.com)
-[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+## 🚀 Architecture Overview
 
-*A production-grade AI system that conducts adaptive technical interviews with real-time emotion detection, voice analysis, and automated PDF report generation.*
+HireIQ consists of three main components:
 
-</div>
+1. **FastAPI Backend** - RESTful API with PostgreSQL database for tenant management
+2. **Celery Workers** - Background task processing for emails, ranking, and reports
+3. **React Frontends** - Separate HR Dashboard and Candidate Portal applications
 
----
+### Technology Stack
 
-## 🎯 What This Project Does
+- **Backend**: FastAPI, SQLAlchemy (async), PostgreSQL 16
+- **Authentication**: JWT tokens with bcrypt password hashing
+- **Task Queue**: Celery with Redis 7 broker
+- **Frontend**: React 18, TypeScript, Vite, TailwindCSS
+- **Database**: MongoDB (AI engine) + PostgreSQL (SaaS layer)
+- **Original AI Engine**: Preserved Streamlit-based interview agent
 
-This is a **full-stack multimodal AI interview platform** that replaces a human interviewer. A candidate uploads their resume, the system parses it, generates adaptive questions, listens to voice answers, analyzes facial emotion in real-time, and produces a detailed PDF performance report at the end.
+## 📁 Project Structure
 
-> 📊 **Multimodal Confidence Score** = 50% Facial Emotion + 30% Voice Tone + 20% Fluency
-
----
-
-## ✨ Features
-
-- **📄 Resume Parsing** — Extracts skills, projects, and candidate info from PDF resumes
-- **🧠 Adaptive Difficulty** — Questions auto-adjust Easy → Medium → Hard → Expert based on performance
-- **🎤 Voice Input** — OpenAI Whisper speech-to-text for answering questions by voice
-- **📹 Facial Emotion Detection** — Real-time analysis via DeepFace (7 emotion classes)
-- **🎧 Voice Emotion Analysis** — Pitch, speed, and hesitation detection via librosa
-- **📊 7 Visualization Charts** — Bar, line, area, radar, pie, step, and grouped bar charts (Plotly)
-- **📄 PDF Report Generation** — Comprehensive multi-page report with FPDF2
-- **🔄 Interview Replay** — Review past interviews with full emotion timeline
-- **💾 MongoDB Storage** — Persistent storage of all interview sessions, questions, emotions
-
----
-
-## 🛠️ Tech Stack
-
-| Component | Technology |
-|-----------|-----------|
-| Frontend | Streamlit |
-| Database | MongoDB (pymongo) |
-| NLP | sentence-transformers, spaCy |
-| Speech Recognition | OpenAI Whisper |
-| Text-to-Speech | gTTS / pyttsx3 |
-| Video / Emotion | OpenCV, DeepFace |
-| Audio Analysis | librosa |
-| Charts | Plotly |
-| PDF Generation | FPDF2 |
-| Containerization | Docker + Docker Compose |
-
----
-
-## 📊 Scoring System
-
-### Answer Score (0–100)
 ```
-Score = 0.4 × Semantic Similarity + 0.3 × Keyword Match + 0.3 × Concept Coverage
+hireiq-saas/
+├── gateway/              # FastAPI application entry point
+├── saas/                 # SaaS business logic
+│   ├── auth/            # Authentication & authorization
+│   ├── companies/       # Company management
+│   ├── jobs/            # Job posting management
+│   ├── candidates/      # Candidate interview flow
+│   ├── dashboard/       # Analytics endpoints
+│   └── middleware/      # Tenant isolation & rate limiting
+├── database/
+│   ├── postgres.py      # PostgreSQL connection & ORM base
+│   ├── pg_models/       # SQLAlchemy models (Company, User, Job, Candidate)
+│   └── migrations/      # Alembic database migrations
+├── workers/
+│   ├── celery_app.py    # Celery configuration
+│   └── tasks/           # Background tasks (email, ranking, reports)
+├── frontend/
+│   ├── hr-dashboard/    # HR web application (port 5173)
+│   └── candidate-portal/# Candidate interview interface (port 5174)
+├── modules/             # Original AI interview engine (FROZEN - never modified)
+└── docker-compose.yml   # Full stack orchestration
 ```
 
-### Confidence Score (0–100)
-```
-Confidence = 0.5 × Facial Emotion + 0.3 × Voice Tone + 0.2 × Fluency
-```
+## 🛠️ Quick Start
 
-### Adaptive Difficulty Logic
-- Starts at **Medium** (Level 2)
-- Rolling average of last 3 answers:
-  - ≥85 → Harder | 60–84 → Same | 40–59 → Easier | <40 → Easy
+### Prerequisites
 
----
+- Docker & Docker Compose
+- Node.js 18+ (for local frontend development)
+- Python 3.10+
 
-## 🚀 Quick Start
-
-### Option 1: Local Setup
+### Running with Docker (Recommended)
 
 ```bash
-# Clone the repository
-git clone https://github.com/ujjawalranjan09/ai-interview-agent.git
-cd ai-interview-agent
+# Start all services (PostgreSQL, Redis, MongoDB, API, Workers)
+docker compose up -d
 
-# Run setup script
-chmod +x setup.sh
-./setup.sh
+# Run database migrations
+docker compose exec api alembic upgrade head
 
-# Activate virtual environment
-source venv/bin/activate
+# Check service health
+curl http://localhost:8000/health
+```
 
-# Configure environment
+**Note**: The legacy Streamlit app is available via Docker profile:
+```bash
+docker compose --profile legacy up -d
+```
+
+### Local Development
+
+#### Backend Setup
+
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Copy environment variables
 cp .env.example .env
-# Edit .env with your API keys
 
-# Ensure MongoDB is running
-mongod --dbpath /path/to/data
+# Run migrations
+alembic upgrade head
 
-# Launch the app
-streamlit run app/main.py
+# Start API server
+uvicorn gateway.main:app --reload --port 8000
+
+# Start Celery worker (separate terminal)
+celery -A workers.celery_app worker --loglevel=info
 ```
 
-### Option 2: Docker
+#### Frontend Setup
 
 ```bash
-git clone https://github.com/ujjawalranjan09/ai-interview-agent.git
-cd ai-interview-agent
-docker-compose up --build
-# Access at http://localhost:8501
+# HR Dashboard
+cd frontend/hr-dashboard
+npm install
+npm run dev  # Runs on http://localhost:5173
+
+# Candidate Portal (separate terminal)
+cd frontend/candidate-portal
+npm install
+npm run dev  # Runs on http://localhost:5174
 ```
 
----
+## 🔑 Environment Variables
 
-## ⚙️ Configuration
+Copy `.env.example` to `.env` and configure:
 
-Edit `.env`:
+### Database
+- `POSTGRES_URL` - PostgreSQL connection string
+- `REDIS_URL` - Redis connection string  
+- `MONGO_URI` - MongoDB connection string
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MONGO_URI` | `mongodb://localhost:27017` | MongoDB connection |
-| `OPENAI_API_KEY` | — | OpenAI API key (optional) |
-| `WHISPER_MODEL` | `base` | Model size: tiny/base/small/medium/large |
-| `TTS_ENGINE` | `gtts` | TTS engine: gtts or pyttsx3 |
-| `DEFAULT_QUESTIONS_COUNT` | `10` | Number of interview questions |
+### Authentication
+- `JWT_SECRET_KEY` - Secret key for JWT signing (generate random 256-bit string)
+- `JWT_ALGORITHM` - JWT algorithm (default: HS256)
+- `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` - Access token lifetime
+- `JWT_REFRESH_TOKEN_EXPIRE_DAYS` - Refresh token lifetime
 
----
+### Email Configuration
+- `MAIL_USERNAME`, `MAIL_PASSWORD` - SMTP credentials
+- `MAIL_FROM`, `MAIL_SERVER`, `MAIL_PORT` - SMTP settings
 
-## 🏗️ Architecture
+### Application URLs
+- `CANDIDATE_PORTAL_BASE_URL` - Candidate portal URL
+- `HR_DASHBOARD_BASE_URL` - HR dashboard URL
+- `FREE_TIER_INTERVIEW_LIMIT` - Monthly interview limit for free tier
 
-```
-ai-interview-agent/
-├── app/                    # Streamlit entry & config
-├── modules/
-│   ├── orchestrator/       # Interview flow control
-│   ├── resume/             # PDF parsing & skill extraction
-│   ├── questions/          # Question generation & difficulty
-│   ├── voice/              # STT, TTS, voice emotion
-│   ├── video/              # Camera & facial emotion
-│   ├── evaluation/         # Answer scoring & confidence
-│   ├── analytics/          # Performance metrics & charts
-│   └── report/             # Feedback, PDF generation, replay
-├── database/               # MongoDB models & queries
-├── frontend/               # Streamlit pages & components
-├── tests/                  # pytest test suite
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-└── .env.example
-```
+## 📡 API Endpoints
 
----
+### Authentication
+- `POST /auth/register` - Register new company & admin user
+- `POST /auth/login` - Login and receive JWT tokens
+- `POST /auth/refresh` - Refresh access token
+
+### Companies
+- `GET /companies/me` - Get current company info
+- `PUT /companies/me` - Update company details
+
+### Jobs
+- `POST /jobs/` - Create new job posting
+- `GET /jobs/` - List all company jobs
+- `GET /jobs/{job_id}` - Get job details
+- `PUT /jobs/{job_id}` - Update job
+- `DELETE /jobs/{job_id}/archive` - Archive a job
+- `POST /jobs/{job_id}/invite` - Send interview invites
+- `GET /jobs/{job_id}/candidates` - List candidates for job
+
+### Candidates
+- `GET /candidates/{token}/validate` - Validate invite token
+- `POST /candidates/{token}/start` - Start interview session
+- `GET /candidates/{token}/status` - Get interview status
+- `GET /candidates/{token}/report` - Download PDF report
+
+### Analytics
+- `GET /analytics/dashboard` - Company-wide statistics
+- `GET /analytics/jobs/{job_id}` - Job-specific analytics
+
+Full API documentation available at: `http://localhost:8000/docs`
+
+## 👥 User Roles
+
+- **Admin**: Full access to company settings, jobs, and analytics
+- **HR**: Can create jobs, invite candidates, view results
+- **Viewer**: Read-only access to dashboard and reports
+
+## 🎯 Key Features
+
+### For HR Teams
+- Create and manage job postings with skill requirements
+- Invite candidates via email with unique interview links
+- View real-time candidate rankings and scores
+- Download detailed PDF interview reports
+- Analytics dashboard with score distributions
+
+### For Candidates
+- Simple one-click interview access via email link
+- AI-powered technical interviews with live feedback
+- Automatic skill assessment and scoring
+- Personal interview report download
+
+### Platform Features
+- Multi-tenant architecture with data isolation
+- Rate limiting (100 requests/minute per IP)
+- Quota management by subscription tier
+- Background email sending with retry logic
+- Automatic candidate ranking after completion
 
 ## 🧪 Testing
 
 ```bash
-# Run all tests
-python -m pytest tests/ -v
+# Run test suite
+pytest tests/ -v
 
-# With coverage report
-pip install pytest-cov
-python -m pytest tests/ --cov=modules --cov-report=html
+# Run with coverage
+pytest tests/ --cov=gateway --cov=saas --cov=workers
 ```
 
----
+## 📦 Deployment
 
-## 🔄 Interview State Machine
+### Render.com
 
+The project includes `render.yaml` for one-click deployment:
+
+```bash
+# Push to GitHub first
+git push origin feature/saas-foundation
+
+# Connect repository in Render dashboard
+# Set environment variables
+# Deploy automatically
 ```
-IDLE → RESUME_PROCESSING → READY → INTRODUCTION → ASKING_QUESTION
-→ LISTENING → PROCESSING_ANSWER → [GENERATING_FOLLOWUP → ASKING_FOLLOWUP]
-→ SELECTING_NEXT_QUESTION → CLOSING → GENERATING_REPORT → COMPLETED
-```
 
----
+### Manual Deployment
 
-## 📄 License
+1. Set up PostgreSQL 16 and Redis 7 instances
+2. Configure environment variables
+3. Run `alembic upgrade head`
+4. Deploy FastAPI app: `uvicorn gateway.main:app --host 0.0.0.0 --port 8000`
+5. Deploy Celery worker: `celery -A workers.celery_app worker`
+6. Build and serve frontends as static sites
 
-MIT License — see [LICENSE](LICENSE) for details.
+## 🔒 Security
 
----
+- Passwords hashed with bcrypt
+- JWT tokens with configurable expiration
+- Role-based access control (RBAC)
+- Tenant isolation prevents cross-company data access
+- Rate limiting prevents abuse
+- CORS configured for specific origins only
 
-<div align="center">
+## 📊 Database Schema
 
-**Built with ❤️ by [Ujjawal Ranjan](https://github.com/ujjawalranjan09) | RTU, Jaipur**
+### PostgreSQL Tables
+- `companies` - Tenant organizations
+- `users` - HR users within companies
+- `jobs` - Job postings
+- `candidates` - Interview candidates
 
-*Redefining technical interviews with multimodal AI.*
+### MongoDB Collections
+- Interview sessions (managed by original AI engine)
+- Skill graphs and assessment data
+- Generated reports
 
-</div>
+## 🔄 Migration from Legacy
+
+The original Streamlit AI Interview Agent remains fully functional:
+- All `modules/` code is preserved and untouched
+- MongoDB schema unchanged
+- Existing interviews continue to work
+
+The new SaaS layer adds:
+- Multi-tenant company management
+- User authentication and authorization
+- Job posting and candidate tracking
+- Professional HR dashboard
+- Scalable background processing
+
+## 📝 License
+
+[Your License Here]
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 🆘 Support
+
+For issues and questions:
+- API Documentation: `http://localhost:8000/docs`
+- GitHub Issues: [Create an issue](https://github.com/ujjawalranjan09/hireiq-saas/issues)
