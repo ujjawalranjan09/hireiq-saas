@@ -3,7 +3,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { JobsPage } from './pages/Jobs';
-import { InterviewDetail } from './pages/InterviewDetail';
+import InterviewDetail from './pages/InterviewDetail';
 
 function App() {
   return (
