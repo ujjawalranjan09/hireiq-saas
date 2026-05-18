@@ -96,9 +96,9 @@ except Exception as e:
 print("\n[Schemas]")
 try:
     from saas.auth.schemas import RegisterRequest, LoginRequest, TokenResponse
-    req = RegisterRequest(email="test@example.com", password="pass123", company_name="Test Corp")
+    req = RegisterRequest(email="test@example.com", password="password123", company_name="Test Corp")
     test("RegisterRequest schema works", req.email == "test@example.com")
-    login = LoginRequest(email="test@example.com", password="pass123")
+    login = LoginRequest(email="test@example.com", password="password123")
     test("LoginRequest schema works", login.email == "test@example.com")
     resp = TokenResponse(access_token="abc", refresh_token="def", user_id=1, company_id=1)
     test("TokenResponse schema works", resp.user_id == 1)
